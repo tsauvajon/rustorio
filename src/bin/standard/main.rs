@@ -32,7 +32,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         steel_technology,
     } = starting_resources;
 
-    // Furnace
+    // First Furnace
     let iron_furnace = Furnace::build(&tick, IronSmelting, iron);
     assert_eq!(0, iron.amount());
 
@@ -67,10 +67,6 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     let copper_furnace = Furnace::build(&tick, CopperSmelting, iron);
 
     // Assembler
-    let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
-    let iron = SmeltIron
-        .mine_and_smelt::<6>(&mut tick, iron_territory, iron_furnace)
-        .unwrap();
     let copper = SmeltCopper
         .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
         .unwrap();
@@ -78,7 +74,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         .0
         .to_resource();
     for _ in 0..5 {
-        let copper = SmeltCopper {}
+        let copper = SmeltCopper
             .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
             .unwrap();
         let new_copper_wires = CopperWireRecipe::craft(&mut tick, (copper,))
@@ -87,6 +83,9 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         copper_wires.add_assign(new_copper_wires);
     }
     let copper_wires = copper_wires.bundle().unwrap();
+    let iron = SmeltIron
+        .mine_and_smelt::<6>(&mut tick, iron_territory, iron_furnace)
+        .unwrap();
     let assembler = Assembler::build(&tick, ElectronicCircuitRecipe, copper_wires, iron);
 
     // RedScienceRecipe
