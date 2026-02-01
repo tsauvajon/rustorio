@@ -31,50 +31,49 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     } = starting_resources;
 
     // First Furnace
-    let iron_furnace = Furnace::build(&tick, IronSmelting, iron);
-    assert_eq!(0, iron.amount());
+    let mut mix_furnace = Furnace::build(&tick, IronSmelting, iron);
 
     // Iron Miner
     let iron = SmeltIron
-        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+        .mine_and_smelt(&mut tick, &mut iron_territory, &mut mix_furnace)
         .unwrap();
-    let copper_furnace = iron_furnace.change_recipe(CopperSmelting).unwrap();
+    let mut mix_furnace = mix_furnace.change_recipe(CopperSmelting).unwrap();
     let copper = SmeltCopper
-        .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+        .mine_and_smelt(&mut tick, &mut copper_territory, &mut mix_furnace)
         .unwrap();
     let miner = Miner::build(iron, copper);
-    iron_territory.add_miner(&tick, miner);
+    iron_territory.add_miner(&tick, miner).unwrap();
 
     // Copper Miner
-    let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
+    let mut mix_furnace = mix_furnace.change_recipe(IronSmelting).unwrap();
     let iron = SmeltIron
-        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+        .mine_and_smelt(&mut tick, &mut iron_territory, &mut mix_furnace)
         .unwrap();
-    let copper_furnace = iron_furnace.change_recipe(CopperSmelting).unwrap();
+    let mut mix_furnace = mix_furnace.change_recipe(CopperSmelting).unwrap();
     let copper = SmeltCopper
-        .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+        .mine_and_smelt(&mut tick, &mut copper_territory, &mut mix_furnace)
         .unwrap();
     let miner = Miner::build(iron, copper);
-    copper_territory.add_miner(&tick, miner);
+    copper_territory.add_miner(&tick, miner).unwrap();
 
     // Dedicated copper furnace
     let iron_ore = iron_territory.resources(&tick).bundle::<10>().unwrap();
-    let mut iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
+    let mut iron_furnace = mix_furnace.change_recipe(IronSmelting).unwrap();
     iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
     tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
     let iron = iron_furnace.outputs(&tick).0.bundle().unwrap();
-    let copper_furnace = Furnace::build(&tick, CopperSmelting, iron);
+    let mut copper_furnace = Furnace::build(&tick, CopperSmelting, iron);
 
     // Assembler
     let copper = SmeltCopper
-        .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+        .mine_and_smelt(&mut tick, &mut copper_territory, &mut copper_furnace)
         .unwrap();
     let mut copper_wires = CopperWireRecipe::craft(&mut tick, (copper,))
         .0
         .to_resource();
     for _ in 0..5 {
         let copper = SmeltCopper
-            .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+            .mine_and_smelt(&mut tick, &mut copper_territory, &mut copper_furnace)
             .unwrap();
         let new_copper_wires = CopperWireRecipe::craft(&mut tick, (copper,))
             .0
@@ -83,16 +82,16 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     }
     let copper_wires = copper_wires.bundle().unwrap();
     let iron = SmeltIron
-        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+        .mine_and_smelt(&mut tick, &mut iron_territory, &mut iron_furnace)
         .unwrap();
     let mut assembler = Assembler::build(&tick, RedScienceRecipe, copper_wires, iron);
 
     // Lab
     let iron = SmeltIron
-        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+        .mine_and_smelt(&mut tick, &mut iron_territory, &mut iron_furnace)
         .unwrap();
     let copper = SmeltCopper
-        .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+        .mine_and_smelt(&mut tick, &mut copper_territory, &mut copper_furnace)
         .unwrap();
     let mut lab = Lab::build(&tick, &steel_technology, iron, copper);
 
@@ -102,17 +101,17 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     for _ in 0..20 {
         // Electronic circuit
         let copper = SmeltCopper
-            .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+            .mine_and_smelt(&mut tick, &mut copper_territory, &mut copper_furnace)
             .unwrap();
         let copper_wires = CopperWireRecipe::craft(&mut tick, (copper,)).0;
         let iron = SmeltIron
-            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .mine_and_smelt(&mut tick, &mut iron_territory, &mut iron_furnace)
             .unwrap();
         let electronic_circuit = ElectronicCircuitRecipe::craft(&mut tick, (iron, copper_wires)).0;
 
         // Red Science
         let iron = SmeltIron
-            .mine_and_smelt::<1>(&mut tick, iron_territory, iron_furnace)
+            .mine_and_smelt::<1>(&mut tick, &mut iron_territory, &mut iron_furnace)
             .unwrap();
         assembler.inputs(&tick).0.add_bundle(iron);
         assembler.inputs(&tick).1.add_bundle(electronic_circuit);
@@ -132,17 +131,17 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     for _ in 0..50 {
         // Electronic circuit
         let copper = SmeltCopper
-            .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+            .mine_and_smelt(&mut tick, &mut copper_territory, &mut copper_furnace)
             .unwrap();
         let copper_wires = CopperWireRecipe::craft(&mut tick, (copper,)).0;
         let iron = SmeltIron
-            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .mine_and_smelt(&mut tick, &mut iron_territory, &mut iron_furnace)
             .unwrap();
         let electronic_circuit = ElectronicCircuitRecipe::craft(&mut tick, (iron, copper_wires)).0;
 
         // Red Science
         let iron = SmeltIron
-            .mine_and_smelt::<1>(&mut tick, iron_territory, iron_furnace)
+            .mine_and_smelt::<1>(&mut tick, &mut iron_territory, &mut iron_furnace)
             .unwrap();
         assembler.inputs(&tick).0.add_bundle(iron);
         assembler.inputs(&tick).1.add_bundle(electronic_circuit);
@@ -174,11 +173,11 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         // 4 Electronic circuits
         for _ in 0..4 {
             let copper = SmeltCopper
-                .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+                .mine_and_smelt(&mut tick, &mut copper_territory, &mut copper_furnace)
                 .unwrap();
             let copper_wires = CopperWireRecipe::craft(&mut tick, (copper,)).0;
             let iron = SmeltIron
-                .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+                .mine_and_smelt(&mut tick, &mut iron_territory, &mut iron_furnace)
                 .unwrap();
             let electronic_circuit =
                 ElectronicCircuitRecipe::craft(&mut tick, (iron, copper_wires)).0;
@@ -186,7 +185,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         }
 
         // Finish smelting steel
-        let steel = steel_furnace.outputs(&tick).0;
+        let steel = steel_furnace.outputs(&tick).0.bundle::<1>().unwrap();
         assembler.inputs(&tick).1.add(steel);
     }
     let points = assembler.outputs(&tick).0.bundle().unwrap();
@@ -213,8 +212,8 @@ trait Smelting {
     fn mine_and_smelt<const AMOUNT: u32>(
         &self,
         tick: &mut Tick,
-        territory: Territory<Self::Ore>,
-        mut furnace: Furnace<Self::Recipe>,
+        territory: &mut Territory<Self::Ore>,
+        mut furnace: &mut Furnace<Self::Recipe>,
     ) -> Result<Bundle<Self::Smelted, AMOUNT>, InsufficientResourceError<Self::Smelted>> {
         self.mine_into_furnace::<AMOUNT>(tick, territory, &mut furnace);
 
@@ -231,7 +230,7 @@ trait Smelting {
     fn mine_into_furnace<const AMOUNT: u32>(
         &self,
         tick: &mut Tick,
-        mut territory: Territory<Self::Ore>,
+        territory: &mut Territory<Self::Ore>,
         mut furnace: &mut Furnace<Self::Recipe>,
     ) {
         let mut remaining = AMOUNT;
