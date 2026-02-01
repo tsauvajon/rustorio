@@ -1,9 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::{
-    ops::{Add, AddAssign},
-    u64,
-};
+use std::{ops::AddAssign, u64};
 
 use rustorio::{
     self, Bundle, HandRecipe, InsufficientResourceError, Resource, ResourceType, Tick,
@@ -38,22 +35,22 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
 
     // Iron Miner
     let iron = SmeltIron
-        .mine_and_smelt::<10>(&mut tick, iron_territory, iron_furnace)
+        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
         .unwrap();
     let copper_furnace = iron_furnace.change_recipe(CopperSmelting).unwrap();
     let copper = SmeltCopper
-        .mine_and_smelt::<5>(&mut tick, copper_territory, copper_furnace)
+        .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
         .unwrap();
     let miner = Miner::build(iron, copper);
     iron_territory.add_miner(&tick, miner);
 
     // Copper Miner
     let iron = SmeltIron
-        .mine_and_smelt::<10>(&mut tick, iron_territory, iron_furnace)
+        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
         .unwrap();
     let copper_furnace = iron_furnace.change_recipe(CopperSmelting).unwrap();
     let copper = SmeltCopper
-        .mine_and_smelt::<5>(&mut tick, copper_territory, copper_furnace)
+        .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
         .unwrap();
     let miner = Miner::build(iron, copper);
     copper_territory.add_miner(&tick, miner);
@@ -84,7 +81,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     }
     let copper_wires = copper_wires.bundle().unwrap();
     let iron = SmeltIron
-        .mine_and_smelt::<6>(&mut tick, iron_territory, iron_furnace)
+        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
         .unwrap();
     let assembler = Assembler::build(&tick, ElectronicCircuitRecipe, copper_wires, iron);
 
@@ -92,7 +89,13 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     // ElectronicCircuitRecipe
 
     // Lab
-    // Lab::build(&tick, &steel_technology, iron, copper);
+    let iron = SmeltIron
+        .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+        .unwrap();
+    let copper = SmeltCopper
+        .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+        .unwrap();
+    Lab::build(&tick, &steel_technology, iron, copper);
 
     // // Dedicated steel furnace
     // let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
@@ -103,19 +106,6 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     // let steel_furnace = Furnace::build(&tick, SteelSmelting, iron);
 
     // Points farming
-}
-
-// TODO: use the Smelting trait instead
-fn put_all_ores_in_furnaces(
-    tick: &Tick,
-    iron_territory: &mut Territory<IronOre>,
-    copper_territory: &mut Territory<CopperOre>,
-    iron_furnace: &Furnace<IronSmelting>,
-    copper_furnace: &Furnace<CopperSmelting>,
-) {
-    let iron_ore = iron_territory.resources(tick);
-    let copper_ore = copper_territory.resources(tick);
-    iron_furnace.inputs(tick).0.add(iron_ore);
 }
 
 trait Smelting {
