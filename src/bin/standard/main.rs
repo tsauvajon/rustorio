@@ -6,14 +6,13 @@ use std::{
 };
 
 use rustorio::{
-    self, Bundle, HandRecipe, InsufficientResourceError, Recipe, Resource, ResourceType, Tick,
+    self, Bundle, HandRecipe, InsufficientResourceError, Resource, ResourceType, Tick,
     buildings::{Assembler, Furnace, Lab},
     gamemodes::Standard,
     recipes::{
         CopperSmelting, CopperWireRecipe, ElectronicCircuitRecipe, FurnaceRecipe, IronSmelting,
-        RedScienceRecipe, SteelSmelting,
     },
-    resources::{Copper, CopperOre, CopperWire, ElectronicCircuit, Iron, IronOre, Point},
+    resources::{Copper, CopperOre, Iron, IronOre, Point},
     territory::{Miner, Territory},
 };
 
@@ -37,6 +36,17 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     let iron_furnace = Furnace::build(&tick, IronSmelting, iron);
     assert_eq!(0, iron.amount());
 
+    // Iron Miner
+    let iron = SmeltIron
+        .mine_and_smelt::<10>(&mut tick, iron_territory, iron_furnace)
+        .unwrap();
+    let copper_furnace = iron_furnace.change_recipe(CopperSmelting).unwrap();
+    let copper = SmeltCopper
+        .mine_and_smelt::<5>(&mut tick, copper_territory, copper_furnace)
+        .unwrap();
+    let miner = Miner::build(iron, copper);
+    iron_territory.add_miner(&tick, miner);
+
     // Copper Miner
     let iron = SmeltIron
         .mine_and_smelt::<10>(&mut tick, iron_territory, iron_furnace)
@@ -48,16 +58,13 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     let miner = Miner::build(iron, copper);
     copper_territory.add_miner(&tick, miner);
 
-    // Iron Miner
-    let iron = SmeltIron
-        .mine_and_smelt::<10>(&mut tick, iron_territory, iron_furnace)
-        .unwrap();
-    let copper_furnace = iron_furnace.change_recipe(CopperSmelting).unwrap();
-    let copper = SmeltCopper
-        .mine_and_smelt::<5>(&mut tick, copper_territory, copper_furnace)
-        .unwrap();
-    let miner = Miner::build(iron, copper);
-    iron_territory.add_miner(&tick, miner);
+    // Dedicated copper furnace
+    let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
+    let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
+    iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
+    tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
+    let iron = iron_furnace.outputs(&tick).0.bundle().unwrap();
+    let copper_furnace = Furnace::build(&tick, CopperSmelting, iron);
 
     // Assembler
     let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
@@ -82,18 +89,11 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     let copper_wires = copper_wires.bundle().unwrap();
     let assembler = Assembler::build(&tick, ElectronicCircuitRecipe, copper_wires, iron);
 
-    // Dedicated copper furnace
-    let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
-    let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
-    iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
-    tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
-    let iron = iron_furnace.outputs(&tick).0.bundle().unwrap();
-    let copper_furnace = Furnace::build(&tick, CopperSmelting, iron);
-
     // RedScienceRecipe
     // ElectronicCircuitRecipe
 
-    Lab::build(&tick, &steel_technology, iron, copper);
+    // Lab
+    // Lab::build(&tick, &steel_technology, iron, copper);
 
     // // Dedicated steel furnace
     // let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
@@ -102,6 +102,8 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     // tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
     // let iron = iron_furnace.outputs(&tick).0.bundle().unwrap();
     // let steel_furnace = Furnace::build(&tick, SteelSmelting, iron);
+
+    // Points farming
 }
 
 // TODO: use the Smelting trait instead
@@ -149,6 +151,7 @@ trait Smelting {
         self.first_output(tick, &mut furnace).bundle()
     }
 
+    // optimise: parallelise many miners - this should take care of ticks naturally IMO
     fn mine_into_furnace<const AMOUNT: u32>(
         &self,
         tick: &mut Tick,
