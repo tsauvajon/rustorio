@@ -58,7 +58,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     copper_territory.add_miner(&tick, miner);
 
     // Dedicated copper furnace
-    let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
+    let iron_ore = iron_territory.resources(&tick).bundle::<10>().unwrap();
     let mut iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
     iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
     tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
@@ -112,12 +112,12 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
 
         // Red Science
         let iron = SmeltIron
-            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .mine_and_smelt::<1>(&mut tick, iron_territory, iron_furnace)
             .unwrap();
         assembler.inputs(&tick).0.add_bundle(iron);
         assembler.inputs(&tick).1.add_bundle(electronic_circuit);
         tick.advance_until(|_tick| assembler.output_amounts().0.gt(&0), u64::MAX);
-        let red_science = assembler.outputs(&tick).0.bundle().unwrap();
+        let red_science = assembler.outputs(&tick).0.bundle::<1>().unwrap();
 
         // Feed science to lab
         lab.inputs(&tick).0.add(red_science);
@@ -142,12 +142,12 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
 
         // Red Science
         let iron = SmeltIron
-            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .mine_and_smelt::<1>(&mut tick, iron_territory, iron_furnace)
             .unwrap();
         assembler.inputs(&tick).0.add_bundle(iron);
         assembler.inputs(&tick).1.add_bundle(electronic_circuit);
         tick.advance_until(|_tick| assembler.output_amounts().0.gt(&0), u64::MAX);
-        let red_science = assembler.outputs(&tick).0.bundle().unwrap();
+        let red_science = assembler.outputs(&tick).0.bundle::<1>().unwrap();
 
         // Feed science to lab
         lab.inputs(&tick).0.add(red_science);
@@ -159,7 +159,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
 
     // Dedicated steel furnace
     // optimise: build at the same time as something else ticking
-    let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
+    let iron_ore = iron_territory.resources(&tick).bundle::<10>().unwrap();
     iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
     tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
     let iron = iron_furnace.outputs(&tick).0.bundle().unwrap();
@@ -168,7 +168,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     let mut assembler = assembler.change_recipe(points_recipe).unwrap();
     for _ in 0..200 {
         // Iron in oven to save some time
-        let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
+        let iron_ore = iron_territory.resources(&tick).bundle::<5>().unwrap();
         iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
 
         // 4 Electronic circuits
