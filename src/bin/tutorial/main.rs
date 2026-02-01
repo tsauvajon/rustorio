@@ -24,10 +24,13 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         guide: _,
     } = starting_resources;
 
-    let copper_ore = copper_territory.hand_mine::<4>(&mut tick);
     let mut furnace = Furnace::build(&tick, CopperSmelting {}, iron);
-    furnace.inputs(&tick).0.add(copper_ore);
-    tick.advance_by(CopperSmelting::TIME * 4);
+
+    for _ in 0..4 {
+        let copper_ore = copper_territory.hand_mine::<1>(&mut tick);
+        furnace.inputs(&tick).0.add(copper_ore);
+    }
+    tick.advance_until(|tick| furnace.outputs(&tick).0.amount().ge(&4), 999);
 
     let copper = furnace.outputs(&tick).0.bundle().unwrap();
 
