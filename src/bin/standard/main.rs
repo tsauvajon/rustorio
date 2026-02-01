@@ -97,6 +97,8 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         .unwrap();
     Lab::build(&tick, &steel_technology, iron, copper);
 
+    // Electronic Circuits and Red Science could be built earlier to make miners run in the meantime maybe
+
     // // Dedicated steel furnace
     // let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
     // let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
@@ -148,23 +150,28 @@ trait Smelting {
         mut territory: Territory<Self::Ore>,
         mut furnace: &mut Furnace<Self::Recipe>,
     ) {
-        for hand_mined in 0..AMOUNT {
-            let remaining = AMOUNT - hand_mined;
+        let mut remaining = AMOUNT;
+        for _ in 0..AMOUNT {
             let resources = territory.resources(tick);
+            let resources = resources.split_off_max(remaining);
 
-            if resources.amount().ge(&remaining) {
-                let resources = resources.split_off(remaining).unwrap();
-                self.first_input(tick, &mut furnace).add(resources);
+            remaining -= resources.amount();
+            self.first_input(tick, &mut furnace).add(resources);
 
+            if remaining == 0 {
                 return;
             }
 
             let ore = territory.hand_mine::<1>(tick);
+            // For manual optimisation
+            eprintln!("WARN: hand mining {} at tick {tick}", Self::Ore::NAME);
+            remaining -= 1;
             self.first_input(tick, &mut furnace).add_bundle(ore);
         }
     }
 }
 
+// TODO: make it hold the territory and a furnace array so it's easier to call?
 struct SmeltIron;
 
 impl Smelting for SmeltIron {
