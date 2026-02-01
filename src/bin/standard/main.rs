@@ -151,7 +151,8 @@ trait Smelting {
         self.first_output(tick, &mut furnace).bundle()
     }
 
-    // optimise: parallelise many miners - this should take care of ticks naturally IMO
+    // optimise: (step1) parallelise many miners - this should take care of ticks naturally IMO
+    // optimise: (step2) use a 'yield' system to make progress on all things at once
     fn mine_into_furnace<const AMOUNT: u32>(
         &self,
         tick: &mut Tick,
@@ -165,10 +166,12 @@ trait Smelting {
             if resources.amount().ge(&remaining) {
                 let resources = resources.split_off(remaining).unwrap();
                 self.first_input(tick, &mut furnace).add(resources);
+
+                return;
             }
 
-            let iron_ore = territory.hand_mine::<1>(tick);
-            self.first_input(tick, &mut furnace).add_bundle(iron_ore);
+            let ore = territory.hand_mine::<1>(tick);
+            self.first_input(tick, &mut furnace).add_bundle(ore);
         }
     }
 }
