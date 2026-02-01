@@ -3,12 +3,14 @@
 use std::{ops::AddAssign, u64};
 
 use rustorio::{
-    self, Bundle, HandRecipe, InsufficientResourceError, Resource, ResourceType, Tick,
+    self, Bundle, HandRecipe, InsufficientResourceError, Resource, ResourceType, Technology, Tick,
     buildings::{Assembler, Furnace, Lab},
     gamemodes::Standard,
     recipes::{
         CopperSmelting, CopperWireRecipe, ElectronicCircuitRecipe, FurnaceRecipe, IronSmelting,
+        RedScienceRecipe,
     },
+    research::PointsTechnology,
     resources::{Copper, CopperOre, Iron, IronOre, Point},
     territory::{Miner, Territory},
 };
@@ -83,10 +85,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     let iron = SmeltIron
         .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
         .unwrap();
-    let assembler = Assembler::build(&tick, ElectronicCircuitRecipe, copper_wires, iron);
-
-    // RedScienceRecipe
-    // ElectronicCircuitRecipe
+    let assembler = Assembler::build(&tick, RedScienceRecipe, copper_wires, iron);
 
     // Lab
     let iron = SmeltIron
@@ -95,19 +94,76 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     let copper = SmeltCopper
         .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
         .unwrap();
-    Lab::build(&tick, &steel_technology, iron, copper);
+    let lab = Lab::build(&tick, &steel_technology, iron, copper);
 
-    // Electronic Circuits and Red Science could be built earlier to make miners run in the meantime maybe
+    // optimisation: start building some Electronic Circuits and Red Science earlier
 
-    // // Dedicated steel furnace
-    // let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
-    // let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
-    // iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
-    // tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
-    // let iron = iron_furnace.outputs(&tick).0.bundle().unwrap();
-    // let steel_furnace = Furnace::build(&tick, SteelSmelting, iron);
+    // Research steel
+    for _ in 0..20 {
+        // Electronic circuit
+        let copper = SmeltCopper
+            .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+            .unwrap();
+        let copper_wires = CopperWireRecipe::craft(&mut tick, (copper,)).0;
+        let iron = SmeltIron
+            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .unwrap();
+        let electronic_circuit = ElectronicCircuitRecipe::craft(&mut tick, (iron, copper_wires)).0;
 
-    // Points farming
+        // Red Science
+        let iron = SmeltIron
+            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .unwrap();
+        assembler.inputs(&tick).0.add_bundle(iron);
+        assembler.inputs(&tick).1.add_bundle(electronic_circuit);
+        tick.advance_until(|_tick| assembler.output_amounts().0.gt(&0), u64::MAX);
+        let red_science = assembler.outputs(&tick).0.bundle().unwrap();
+
+        // Feed science to lab
+        lab.inputs(&tick).0.add(red_science);
+    }
+
+    tick.advance_until(|tick| lab.outputs(&tick).0.amount().ge(&20), u64::MAX);
+    let research_points = lab.outputs(&tick).0.bundle().unwrap();
+    let (steel_smelting, points_technology) = steel_technology.research(research_points);
+
+    // Dedicated steel furnace
+    let iron_ore = iron_territory.resources(&tick).bundle().unwrap();
+    let iron_furnace = copper_furnace.change_recipe(IronSmelting).unwrap();
+    iron_furnace.inputs(&tick).0.add_bundle(iron_ore);
+    tick.advance_until(|_tick| iron_furnace.output_amounts().0 == 10, u64::MAX);
+    let iron = iron_furnace.outputs(&tick).0.bundle().unwrap();
+    let steel_furnace = Furnace::build(&tick, steel_smelting, iron);
+
+    // Research Points
+    let lab = lab.change_technology(&points_technology).unwrap();
+    for _ in 0..50 {
+        // Electronic circuit
+        let copper = SmeltCopper
+            .mine_and_smelt(&mut tick, copper_territory, copper_furnace)
+            .unwrap();
+        let copper_wires = CopperWireRecipe::craft(&mut tick, (copper,)).0;
+        let iron = SmeltIron
+            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .unwrap();
+        let electronic_circuit = ElectronicCircuitRecipe::craft(&mut tick, (iron, copper_wires)).0;
+
+        // Red Science
+        let iron = SmeltIron
+            .mine_and_smelt(&mut tick, iron_territory, iron_furnace)
+            .unwrap();
+        assembler.inputs(&tick).0.add_bundle(iron);
+        assembler.inputs(&tick).1.add_bundle(electronic_circuit);
+        tick.advance_until(|_tick| assembler.output_amounts().0.gt(&0), u64::MAX);
+        let red_science = assembler.outputs(&tick).0.bundle().unwrap();
+
+        // Feed science to lab
+        lab.inputs(&tick).0.add(red_science);
+    }
+
+    tick.advance_until(|tick| lab.outputs(&tick).0.amount().ge(&50), u64::MAX);
+    let research_points = lab.outputs(&tick).0.bundle().unwrap();
+    let points_recipe = points_technology.research(research_points);
 }
 
 trait Smelting {
@@ -155,7 +211,7 @@ trait Smelting {
             let resources = territory.resources(tick);
             let resources = resources.split_off_max(remaining);
 
-            remaining -= resources.amount();
+            remaining = remaining - resources.amount();
             self.first_input(tick, &mut furnace).add(resources);
 
             if remaining == 0 {
@@ -165,7 +221,7 @@ trait Smelting {
             let ore = territory.hand_mine::<1>(tick);
             // For manual optimisation
             eprintln!("WARN: hand mining {} at tick {tick}", Self::Ore::NAME);
-            remaining -= 1;
+            remaining = remaining - 1;
             self.first_input(tick, &mut furnace).add_bundle(ore);
         }
     }
