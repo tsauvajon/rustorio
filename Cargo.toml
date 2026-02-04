@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 rustorio = { version = "0.1.2", default-features = false }
+rustorio-engine = "0.1.2"

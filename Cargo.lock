@@ -92,6 +92,7 @@ name = "rustorio-game"
 version = "0.1.0"
 dependencies = [
  "rustorio",
+ "rustorio-engine",
 ]
 
 [[package]]

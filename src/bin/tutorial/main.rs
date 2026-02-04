@@ -1,9 +1,7 @@
 #![forbid(unsafe_code)]
 
-use rustorio::Recipe;
 use rustorio::buildings::Furnace;
 use rustorio::recipes::CopperSmelting;
-use rustorio::territory::MINING_TICK_LENGTH;
 use rustorio::{self, Bundle, Tick, gamemodes::Tutorial, resources::Copper};
 
 type GameMode = Tutorial;
