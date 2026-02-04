@@ -3,16 +3,16 @@
 use std::{ops::AddAssign, u64};
 
 use rustorio::{
-    self, Bundle, HandRecipe, InsufficientResourceError, Resource, ResourceType, Technology, Tick,
+    self, Bundle, HandRecipe, Technology, Tick,
     buildings::{Assembler, Furnace, Lab},
     gamemodes::Standard,
     recipes::{
-        CopperSmelting, CopperWireRecipe, ElectronicCircuitRecipe, FurnaceRecipe, IronSmelting,
-        RedScienceRecipe,
+        CopperSmelting, CopperWireRecipe, ElectronicCircuitRecipe, IronSmelting, RedScienceRecipe,
     },
-    resources::{Copper, CopperOre, Iron, IronOre, Point},
-    territory::{Miner, Territory},
+    resources::Point,
+    territory::Miner,
 };
+use rustorio_game::{SmeltCopper, SmeltIron, Smelting as _};
 
 type GameMode = Standard;
 
@@ -103,7 +103,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     // optimisation: start building some Electronic Circuits and Red Science earlier
 
     // Research steel
-    for i in 1..=20 {
+    for _ in 1..=20 {
         // Electronic circuit
         let copper = SmeltCopper
             .mine_and_smelt(&mut tick, &mut copper_territory, &mut copper_furnace)
@@ -125,7 +125,6 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
 
         // Feed science to lab
         lab.inputs(&tick).0.add(red_science);
-        println!("INFO: fed lab with {i} red science at tick {tick}");
     }
 
     tick.advance_until(|tick| lab.outputs(&tick).0.amount().ge(&20), u64::MAX);
@@ -158,7 +157,6 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         // Feed science to lab
         lab.inputs(&tick).0.add(red_science);
     }
-    println!("INFO: fed lab with 50 red science at tick {tick}");
 
     tick.advance_until(|tick| lab.outputs(&tick).0.amount().ge(&50), u64::MAX);
     let research_points = lab.outputs(&tick).0.bundle().unwrap();
@@ -174,7 +172,7 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     println!("INFO: got steel furnace at tick {tick}");
 
     let mut assembler = assembler.change_recipe(points_recipe).unwrap();
-    for i in 1..=200 {
+    for _ in 1..=200 {
         // Iron in steel furnace ASAP to save some time
         let iron = SmeltIron
             .mine_and_smelt::<5>(&mut tick, &mut iron_territory, &mut iron_furnace)
@@ -202,7 +200,6 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
         );
         let steel = steel_furnace.outputs(&tick).0.bundle::<1>().unwrap();
         assembler.inputs(&tick).1.add(steel);
-        println!("INFO: fed lab with {i} red science at tick {tick}");
     }
 
     tick.advance_until(
@@ -213,118 +210,4 @@ fn user_main(mut tick: Tick, starting_resources: StartingResources) -> (Tick, Bu
     println!("INFO: built 200 points at tick {tick}");
 
     (tick, points)
-}
-
-trait Smelting {
-    type Ore: ResourceType;
-    type Smelted: ResourceType;
-    type Recipe: FurnaceRecipe;
-
-    fn first_input<'a>(
-        &self,
-        tick: &Tick,
-        furnace: &'a mut Furnace<Self::Recipe>,
-    ) -> &'a mut Resource<Self::Ore>;
-    fn first_output<'a>(
-        &self,
-        tick: &Tick,
-        furnace: &'a mut Furnace<Self::Recipe>,
-    ) -> &'a mut Resource<Self::Smelted>;
-
-    fn mine_and_smelt<const AMOUNT: u32>(
-        &self,
-        tick: &mut Tick,
-        territory: &mut Territory<Self::Ore>,
-        mut furnace: &mut Furnace<Self::Recipe>,
-    ) -> Result<Bundle<Self::Smelted, AMOUNT>, InsufficientResourceError<Self::Smelted>> {
-        self.mine_into_furnace::<AMOUNT>(tick, territory, &mut furnace);
-
-        // optimise: only ever tick by hand mining, never by just waiting
-        tick.advance_until(
-            |tick| self.first_output(tick, &mut furnace).amount().ge(&AMOUNT),
-            u64::MAX,
-        );
-        self.first_output(tick, &mut furnace).bundle()
-    }
-
-    // optimise: (step1) parallelise many miners - this should take care of ticks naturally IMO
-    // optimise: (step2) use a 'yield' system to make progress on all things at once
-    fn mine_into_furnace<const AMOUNT: u32>(
-        &self,
-        tick: &mut Tick,
-        territory: &mut Territory<Self::Ore>,
-        mut furnace: &mut Furnace<Self::Recipe>,
-    ) {
-        let mut remaining = AMOUNT;
-        for _ in 0..AMOUNT {
-            let resources = territory.resources(tick);
-            let resources = resources.split_off_max(remaining);
-
-            remaining = remaining - resources.amount();
-            self.first_input(tick, &mut furnace).add(resources);
-
-            if remaining == 0 {
-                return;
-            }
-
-            let ore = territory.hand_mine::<1>(tick);
-            // For manual optimisation
-            eprintln!("WARN: hand mining {} at tick {tick}", Self::Ore::NAME);
-            remaining = remaining - 1;
-            self.first_input(tick, &mut furnace).add_bundle(ore);
-        }
-    }
-}
-
-// TODO: make it hold the territory and a furnace array so it's easier to call?
-struct SmeltIron;
-
-impl Smelting for SmeltIron {
-    type Ore = IronOre;
-
-    type Smelted = Iron;
-
-    type Recipe = IronSmelting;
-
-    fn first_input<'a>(
-        &self,
-        tick: &Tick,
-        furnace: &'a mut Furnace<Self::Recipe>,
-    ) -> &'a mut Resource<Self::Ore> {
-        &mut furnace.inputs(tick).0
-    }
-
-    fn first_output<'a>(
-        &self,
-        tick: &Tick,
-        furnace: &'a mut Furnace<Self::Recipe>,
-    ) -> &'a mut Resource<Self::Smelted> {
-        &mut furnace.outputs(tick).0
-    }
-}
-
-struct SmeltCopper;
-
-impl Smelting for SmeltCopper {
-    type Ore = CopperOre;
-
-    type Smelted = Copper;
-
-    type Recipe = CopperSmelting;
-
-    fn first_input<'a>(
-        &self,
-        tick: &Tick,
-        furnace: &'a mut Furnace<Self::Recipe>,
-    ) -> &'a mut Resource<Self::Ore> {
-        &mut furnace.inputs(tick).0
-    }
-
-    fn first_output<'a>(
-        &self,
-        tick: &Tick,
-        furnace: &'a mut Furnace<Self::Recipe>,
-    ) -> &'a mut Resource<Self::Smelted> {
-        &mut furnace.outputs(tick).0
-    }
 }
